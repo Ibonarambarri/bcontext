@@ -1,0 +1,38 @@
+{
+  "name": "@bcontext-dev/contract",
+  "version": "0.12.0",
+  "description": "The contract between bcontext-api and bcontext-web: types, schemas, vocabularies and the pure helpers both sides use.",
+  "license": "AGPL-3.0-only",
+  "private": false,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "verify": "npm run -s build && npm run -s test"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^3.23.8",
+    "tldts": "^7.4.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ibonarambarri/bcontext.git",
+    "directory": "packages/contract"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.6"
+  }
+}

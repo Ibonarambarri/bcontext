@@ -1,0 +1,360 @@
+# Bcontext, self-hosted: one `docker compose up -d` on one machine.
+#
+#   ./setup.sh                 # writes .env with fresh secrets (once)
+#   docker compose up -d       # pulls the release images (or builds them)
+#
+# Services:
+#   caddy                      the only published ports (80/443): web, API, MCP, Supabase
+#   web, api, worker           Bcontext (api and worker are the same image)
+#   migrate                    one-shot: applies apps/api/supabase/migrations, then exits
+#   db, auth, rest, storage, kong   a minimal Supabase (Postgres 15 + pgvector, GoTrue, PostgREST, Storage on disk)
+#   errors   (profile errors)  the error collector; set ERRORS_INGEST_URL=http://errors:4100
+#   studio, meta (profile studio)  Supabase Studio on 127.0.0.1:${STUDIO_PORT:-54323}
+#
+# Data lives in the named volumes `db-data`, `db-config` (the Vault key) and
+# `storage-data`. Back them up (docs/self-hosting.md#backups).
+
+name: bcontext
+
+x-bcontext-image: &bcontext-api
+  image: ghcr.io/ibonarambarri/bcontext-api:${BCONTEXT_VERSION:-latest}
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  pull_policy: ${BCONTEXT_PULL_POLICY:-missing}
+  restart: unless-stopped
+  env_file: .env
+  # Lets OPENAI_BASE_URL reach a model server on the host (Ollama, LiteLLM)
+  # as http://host.docker.internal:<port> on Linux too.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+x-bcontext-web-image: &bcontext-web
+  image: ghcr.io/ibonarambarri/bcontext-web:${BCONTEXT_VERSION:-latest}
+  build:
+    context: .
+    dockerfile: apps/web/Dockerfile
+  pull_policy: ${BCONTEXT_PULL_POLICY:-missing}
+  restart: unless-stopped
+
+x-bcontext-env: &bcontext-env
+  # Server-side Supabase goes over the internal network; browsers reach the
+  # same gateway through Caddy at PUBLIC_URL.
+  SUPABASE_URL: http://kong:8000
+  SUPABASE_PUBLIC_URL: ${PUBLIC_URL:?run ./setup.sh first}
+  SUPABASE_ANON_KEY: ${ANON_KEY}
+  SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+  DATABASE_SSL: disable
+  APP_URL: ${PUBLIC_URL}
+  API_ORIGIN: http://api:4000
+  NODE_ENV: production
+
+services:
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    environment:
+      BCONTEXT_SITE_ADDRESS: ${BCONTEXT_SITE_ADDRESS:-http://localhost}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+
+  web:
+    <<: *bcontext-web
+    environment:
+      # Read at runtime (apps/web/src/lib/public-env.ts): the same image
+      # serves any domain.
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${PUBLIC_URL:?run ./setup.sh first}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      REALTIME_PUBLIC_URL: ${REALTIME_PUBLIC_URL}
+      API_ORIGIN: http://api:4000
+      ERRORS_INGEST_URL: ${ERRORS_INGEST_URL:-}
+      ERRORS_INGEST_KEY: ${ERRORS_INGEST_KEY}
+      NANGO_PUBLIC_HOST: ${NANGO_PUBLIC_URL:-}
+      NANGO_CONNECT_URL: ${NANGO_CONNECT_URL:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/env.js"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    depends_on:
+      api:
+        condition: service_started
+
+  api:
+    <<: *bcontext-api
+    environment:
+      <<: *bcontext-env
+      BCONTEXT_PROCESS: api
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kong:
+        condition: service_started
+
+  worker:
+    <<: *bcontext-api
+    environment:
+      <<: *bcontext-env
+      BCONTEXT_PROCESS: worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  errors:
+    <<: *bcontext-api
+    profiles: [errors]
+    environment:
+      <<: *bcontext-env
+      BCONTEXT_PROCESS: errors
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    image: postgres:15.19-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/migrate.sh"]
+    environment:
+      PGHOST: db
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./deploy/migrate/migrate.sh:/migrate.sh:ro
+      - ./apps/api/supabase/migrations:/migrations:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+
+  # --- Supabase -------------------------------------------------------------
+  # Pinned to the versions of supabase/supabase's docker/ setup with its
+  # Postgres 15 override; see deploy/supabase for the gateway config.
+
+  db:
+    image: supabase/postgres:15.8.1.085
+    restart: unless-stopped
+    volumes:
+      - ./deploy/supabase/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./deploy/supabase/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+      - db-data:/var/lib/postgresql/data
+      - db-config:/etc/postgresql-custom
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_min_messages=fatal"]
+
+  auth:
+    image: supabase/gotrue:v2.196.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${PUBLIC_URL}/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${PUBLIC_URL}
+      GOTRUE_URI_ALLOW_LIST: ${PUBLIC_URL}/**
+      # Accounts are created by the API (POST /api/signup, invitations) with
+      # the service role, which works with public signup off. Off by default so
+      # GoTrue's own /signup (reachable with the public anon key) cannot
+      # sidestep ORG_CREATION and the API's rate limits.
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-true}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_ISSUER: ${PUBLIC_URL}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      # true when no email transport is configured (setup.sh decides).
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-465}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Bcontext}
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+
+  rest:
+    image: postgrest/postgrest:v14.17
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,graphql_public
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_DB_EXTRA_SEARCH_PATH: public,extensions
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY:-3600}
+    command: ["postgrest"]
+
+  storage:
+    image: supabase/storage-api:v1.74.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      STORAGE_PUBLIC_URL: ${PUBLIC_URL}
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      GLOBAL_S3_BUCKET: stub
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes:
+      - storage-data:/var/lib/storage
+
+  kong:
+    image: kong:3.9.3
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      storage:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./deploy/supabase/kong.yml:/home/kong/temp.yml:ro
+      - ./deploy/supabase/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_DNS_NOT_FOUND_TTL: 1
+      KONG_DNS_VALID_TTL: 5
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,post-function
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # nginx defaults to one worker per CPU (~60 MB each); two are plenty here.
+      KONG_NGINX_WORKER_PROCESSES: "2"
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    entrypoint: ["/bin/sh", "/home/kong/kong-entrypoint.sh"]
+
+  # --- Optional: Supabase Studio (docker compose --profile studio up -d) ----
+  meta:
+    image: supabase/postgres-meta:v0.99.0
+    profiles: [studio]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+
+  studio:
+    image: supabase/studio:2026.09.07-sha-7996410
+    profiles: [studio]
+    restart: unless-stopped
+    # Loopback only: Studio has no login of its own. Reach it over an SSH
+    # tunnel on a server.
+    ports:
+      - "127.0.0.1:${STUDIO_PORT:-54323}:3000"
+    depends_on:
+      meta:
+        condition: service_started
+    environment:
+      HOSTNAME: "0.0.0.0"
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER_READ_WRITE: postgres
+      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+      PGRST_DB_SCHEMAS: public
+      DEFAULT_ORGANIZATION_NAME: Bcontext
+      DEFAULT_PROJECT_NAME: Bcontext
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      ENABLED_FEATURES_LOGS_ALL: "false"
+
+volumes:
+  db-data:
+  db-config:
+  storage-data:
+  caddy-data:
+  caddy-config:

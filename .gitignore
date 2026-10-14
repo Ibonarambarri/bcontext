@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+coverage/
+.next/
+
+# env files: .env holds this instance's secrets (setup.sh writes it)
+.env
+.env.*
+!.env.example
+
+# supabase CLI scratch
+supabase/.branches
+supabase/.temp
+
+# misc
+.DS_Store
+*.pem
+*.log
+npm-debug.log*
+
+# local agent tooling (user-specific config, may hold secrets)
+.mcp.json
+.claude/

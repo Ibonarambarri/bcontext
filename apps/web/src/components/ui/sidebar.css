@@ -1,0 +1,245 @@
+/* ─────────────────────────────────────────────────────────
+   Sidebar (`./sidebar.tsx`): the navigation rail's look.
+
+   Imported by app/globals.css into the components layer, as HeroUI's own
+   styles are: a utility class at a call site beats these defaults, and
+   the unlayered rules in globals.css (`.org-panel .sidebar…`) beat both.
+
+   Colours are HeroUI tokens (--background, --default, --muted…), so the
+   rail follows the theme switch with no rules of its own.
+   ───────────────────────────────────────────────────────── */
+
+.sidebar__provider {
+  display: flex;
+  width: 100%;
+  min-height: 100svh;
+}
+.sidebar__provider:has(.sidebar__offcanvas-wrapper) {
+  overflow-x: clip;
+}
+
+.sidebar {
+  --sidebar-edge: rgb(0 0 0 / 0.08);
+  --sidebar-duration: 0.2s;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: var(--sidebar-width, 240px);
+  height: 100svh;
+  background-color: var(--background);
+  border-color: var(--border);
+  box-shadow: inset -1px 0 0 var(--sidebar-edge);
+}
+.dark .sidebar,
+[data-theme="dark"] .sidebar {
+  --sidebar-edge: rgb(255 255 255 / 0.1);
+}
+
+/* Offcanvas: the wrapper reserves the rail's width and shrinks to zero
+   while the rail slides out, so the main column grows with it. */
+.sidebar__offcanvas-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  width: var(--sidebar-width, 240px);
+  transition: width 0.2s ease;
+}
+.sidebar__offcanvas-wrapper[data-state="collapsed"] {
+  width: 0;
+}
+.sidebar[data-collapsible="offcanvas"] {
+  z-index: 20;
+  transition: translate var(--sidebar-duration) ease, visibility var(--sidebar-duration);
+}
+.sidebar[data-collapsible="offcanvas"][data-state="collapsed"] {
+  visibility: hidden;
+  translate: -100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__offcanvas-wrapper,
+  .sidebar[data-collapsible="offcanvas"] {
+    transition: none;
+  }
+}
+
+/* Phones get the drawer (`Sidebar.Mobile`) instead of the aside. A rail
+   that cannot collapse has no drawer, so it stays. */
+@media (max-width: 768px) {
+  .sidebar__offcanvas-wrapper,
+  .sidebar[data-collapsible="offcanvas"] {
+    display: none;
+  }
+}
+
+.sidebar__header {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 2);
+  padding: calc(var(--spacing) * 4) calc(var(--spacing) * 4) calc(var(--spacing) * 2);
+}
+.sidebar__content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing);
+  min-height: 0;
+  padding-inline: calc(var(--spacing) * 3);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.sidebar__content::-webkit-scrollbar {
+  display: none;
+}
+.sidebar__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing);
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+}
+
+.sidebar__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing);
+}
+.sidebar__group + .sidebar__group {
+  margin-top: calc(var(--spacing) * 2);
+}
+.sidebar__group-label {
+  overflow: hidden;
+  padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.sidebar__menu {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 0.5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar__menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  color: var(--foreground);
+  text-decoration: none;
+  cursor: var(--cursor-interactive, pointer);
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.sidebar__menu-item-content {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 3);
+  width: 100%;
+  min-width: 0;
+  min-height: calc(var(--spacing) * 9);
+  padding: calc(var(--spacing) * 1.5) 0.5rem;
+  border-radius: calc(var(--radius) * 2);
+  overflow: hidden;
+}
+@media (hover: hover) {
+  .sidebar__menu-item:hover .sidebar__menu-item-content {
+    background-color: var(--default);
+  }
+}
+.sidebar__menu-item[data-current="true"] .sidebar__menu-item-content {
+  background-color: var(--default);
+}
+.sidebar__menu-item:focus-visible .sidebar__menu-item-content {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.sidebar__menu-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--spacing) * 5);
+  height: calc(var(--spacing) * 5);
+  color: var(--muted);
+}
+.sidebar__menu-icon svg {
+  width: calc(var(--spacing) * 4);
+  height: calc(var(--spacing) * 4);
+}
+.sidebar__menu-item[data-current="true"] .sidebar__menu-icon,
+.sidebar__menu-item[data-current="true"] .sidebar__menu-chip {
+  color: var(--foreground);
+}
+
+.sidebar__menu-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--foreground);
+  pointer-events: none;
+  user-select: none;
+}
+.sidebar__menu-item[data-current="true"] .sidebar__menu-label {
+  font-weight: 500;
+}
+.sidebar__menu-label-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sidebar__menu-chip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+.sidebar__main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100svh;
+}
+
+/* The phone drawer: edge to edge, no rounded corners, no dialog padding. */
+.sidebar__mobile-dialog.drawer__dialog {
+  width: 80vw;
+  max-width: 500px;
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+.sidebar__mobile {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.sidebar__mobile > .sidebar__content {
+  flex: 1;
+  min-height: 0;
+}

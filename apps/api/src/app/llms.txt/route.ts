@@ -1,0 +1,81 @@
+/**
+ * Plain-text guide for LLM scrapers. Linked from /.well-known/agents.json
+ * and intentionally short — copy-paste examples first, prose minimal.
+ */
+import { withRoute } from "@/lib/route";
+
+export const GET = withRoute(async (req: Request) => {
+  const url = new URL(req.url);
+  const origin = `${url.protocol}//${url.host}`;
+  const body = [
+    "# Bcontext",
+    "",
+    "The context layer for the AI-first company. Typed knowledge graph + RAG, MCP-native: agents connect over MCP, people use the web app, automations that cannot speak MCP use REST.",
+    "",
+    "## Discovery",
+    "",
+    `- ${origin}/.well-known/agents.json — capabilities, scopes, endpoints, MCP URL`,
+    "",
+    "## Authentication",
+    "",
+    "All API and MCP calls require a workspace-scoped bearer token:",
+    "",
+    "    Authorization: Bearer bctx_live_<43chars>",
+    "",
+    "Tokens are issued from the Bcontext workspace settings → Tokens. Each token belongs to one workspace; scope checks gate per-operation.",
+    "",
+    "## MCP",
+    "",
+    `Streamable HTTP MCP server at ${origin}/mcp/<org>/<workspace> (one endpoint per workspace; ${origin}/mcp takes the workspace from the token) — THE agent surface. If you are an agent, this is where you connect: add it to Claude Code / Cursor / Claude Desktop mcp.json with the bearer token above, or let the client run OAuth discovery from the endpoint's own /.well-known/oauth-protected-resource document — through a workspace endpoint the grant is bound to that workspace.`,
+    "",
+    "Tools are grouped by resource and split by read from write; pick the operation with `op`. Reads: brief (start here: counts, unblocked queue, open decisions, what is assigned to you, changes since your previous brief, views), nodes (get, list — shortcuts or a full view `query`, search), subtasks (list, get), tags, views (list, get, resolve, query), ingest, skills (list, get — a skill as instructions to run with your own model), ask_nexo, ask_rag, list_changes, list_workspaces, ping. Writes: nodes_write (create, update, delete, toggle_checklist_item, append, replace_block, attach_file, set_node_tags), subtasks_write (add, update, delete, toggle, reorder), tags_write (create, update, link, unlink; merge and delete for admins), links_write (link, unlink), views_write (create, duplicate, update, delete), ingest_write (accept, dismiss), skills_write (import), skills_run (server-side, for automations without a model), admin / admin_write, capabilities (list, discover, status) / capabilities_write (connect, disconnect, grant, revoke). tools/list is filtered to what your token's grant actually permits, so a read-only agent never sees the write tools.",
+    "",
+    "External MCP servers connected as capabilities, and the workspace's skills, are never in tools/list: capability_search ranks what you may call (refs `<provider>/<capability>/<tool>` or `skill/<slug>`) and capability_call(ref, args) runs it, re-authorized on every call. With the admin verb an agent discovers and connects them itself (OAuth comes back as an authorization_url for a person to consent to; poll capabilities op=status). Save what a tool returned as a node with nodes_write(op=create, provenance: { capability, tool, invocation_id }) — the invocation id is in the result's _meta.bcontext_gateway.",
+    "",
+    "Write by block: nodes_write(op=append) adds an H2 section at the end and op=replace_block rewrites one by block_id; only that block is spliced, so two agents editing different sections of the same node both land. `unblocked` is one filter everywhere — a saved view, nodes(op=list) and a RAG view scope all use the same dependency rule.",
+    "A task is one node and the steps to finish it are its subtasks (node.data.subtasks, each with a title, a summary the creator writes, and a full content_md) — not more task nodes. Pass `subtasks` on create; edit one step by id with subtasks_write; nodes(op=get) returns them in full.",
+    "Status `archived` is cleanup, not deletion: hidden from views, boards, the graph and nodes(op=list) unless asked (status:\"archived\" / include_archived:true), still readable by id, linked and searchable; any other status restores it. Archived blockers no longer block.",
+    "kind is a node's primary semantics. Tags are reusable workspace taxonomy and one node may carry multiple tags. parent_id optionally connects semantic nodes into a real hierarchy. folder and category are not node fields. Tags classify and filter; they never grant permissions or replace workspace RLS. Tags themselves can form a hierarchy via tag_relations: tags_write(op=create)'s parent_ids/related_ids or tags_write(op=link|unlink) (relation 'parent' = child-of, multi-parent DAG allowed; 'related' = symmetric same-level association); a tag with no parents hangs conceptually off the workspace root. Tag filters inherit downward through that hierarchy: filtering by a tag (nodes op=list tag_ids/tags, view tags_any/tags_all, RAG tags scope, ?tag=) also matches nodes tagged with any descendant tag; nodes keep only their direct tags and 'related' never inherits.",
+    "RAG scope schema v1 supports workspace (default), view, tags any/all, selection, neighborhood, and auto. Explicit scopes are pre-retrieval candidate boundaries. Auto normalizes independent lanes, deduplicates, globally reranks, and never hides its workspace lane. Tags do not create indexes or embeddings.",
+    "ask_nexo is the question tool for agents (ask_rag is the retrieval primitive under it): a cited answer plus confidence (low|medium|high), freshness (stale/superseded hits), open conflicts on the cited nodes, knowledge_gaps, suggested_actions and signals_pending (ingest candidates still processing). mode fast|deep|auto — deep walks blocked_by/supersedes/references one level and cites the superseding node; auto picks deep for why/history questions or a stale top hit and reports mode_effective. Grants apply before rerank and before any model context; without an AI gateway answer is null and the note says so.",
+    "",
+    "## REST",
+    "",
+    "Decided 2026-09-08: REST (/api/*) is for humans and for automations that cannot speak MCP — the web app, scripts, CI hooks, curl. MCP is the agent surface. REST is not at parity with the tools above and is no longer advertised to agents; nothing was removed, /api/agents/{context,write} keep working for the automations that call them.",
+    "",
+    "For an automation without an MCP client, search a workspace via RAG:",
+    "",
+    "    curl -X POST '" + origin + "/api/agents/context' \\",
+    "      -H 'Authorization: Bearer bctx_live_…' \\",
+    "      -H 'Content-Type: application/json' \\",
+    "      -d '{\"workspace\":\"my-ws\",\"query\":\"open auth decisions\",\"k\":6}'",
+    "",
+    "…and propose batched writes (idempotent):",
+    "",
+    "    curl -X POST '" + origin + "/api/agents/write' \\",
+    "      -H 'Authorization: Bearer bctx_live_…' \\",
+    "      -H 'Idempotency-Key: agent-42-batch-7' \\",
+    "      -H 'Content-Type: application/json' \\",
+    "      -d '{\"workspace\":\"my-ws\",\"ops\":[{\"op\":\"create\",\"node\":{\"title\":\"New ADR\",\"kind\":\"adr\",\"parent_id\":null}}]}'",
+    "",
+    "## Limits",
+    "",
+    "- Read scopes: 120 req/min per token",
+    "- Write scopes: 60 req/min",
+    "- Chat: 30 req/min",
+    "- 429 Retry-After is enforced",
+    "",
+    "## Conventions",
+    "",
+    "Structure node content with H2 (##) headings — each section becomes a stable, addressable block. References use `/n/<node_id>#<block_id>` (e.g. `/n/abc#vision`), where `block_id` is the slug of the heading text.",
+    "",
+    "Concurrency: pass `if_updated_at` (the updated_at you last read) when patching content — a 409 means another session wrote first; re-fetch, rebase, retry. Dependencies are typed edges (links_write op=link, relation blocked_by), not prose; `unblocked` filters answer \"what can I start now\".",
+    "",
+  ].join("\n");
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=300",
+    },
+  });
+});

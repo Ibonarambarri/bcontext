@@ -1,0 +1,56 @@
+/* Styles for src/components/ui that Tailwind classes on the element cannot
+   reach: markup injected as HTML (shiki's output inside CodeBlock), SVG that
+   recharts draws, theme-dependent colour picks, and the KPI value class the
+   admin dashboard writes by hand. Imported once from app/globals.css into
+   the components layer, so call-site utilities still win. */
+
+.code-block__code pre {
+  margin: 0;
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  background: transparent !important;
+}
+.code-block__code code {
+  font-family: var(--font-mono);
+}
+/* shiki emits both palettes as variables (defaultColor: false); pick one by
+   the theme the app put on <html>. */
+.code-block__code .shiki,
+.code-block__code .shiki span {
+  color: var(--shiki-light, var(--color-surface-secondary-foreground));
+}
+:is(.dark, [data-theme="dark"]) .code-block__code .shiki,
+:is(.dark, [data-theme="dark"]) .code-block__code .shiki span {
+  color: var(--shiki-dark, var(--color-surface-secondary-foreground));
+}
+
+/* Charts (charts.tsx): quiet axes, a faint grid, a dashed cursor. */
+.bctx-chart .recharts-cartesian-axis-tick-value {
+  font-size: 10px;
+  fill: var(--muted) !important;
+}
+.bctx-chart .recharts-cartesian-axis-line,
+.bctx-chart .recharts-cartesian-axis-tick-line {
+  stroke: none !important;
+}
+.bctx-chart .recharts-cartesian-grid line {
+  stroke: var(--muted);
+  stroke-opacity: 0.15;
+}
+.bctx-chart .recharts-tooltip-cursor {
+  stroke: var(--muted);
+  stroke-dasharray: 4 4;
+  stroke-width: 1px;
+}
+.bctx-chart .recharts-active-dot circle {
+  stroke: var(--surface);
+  stroke-width: 2px;
+}
+
+/* KPI (kpi.tsx): the headline number. */
+.kpi__value {
+  font-size: var(--text-2xl);
+  line-height: var(--text-2xl--line-height);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--foreground);
+}

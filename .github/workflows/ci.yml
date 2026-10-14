@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (${{ matrix.workspace }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ["@bcontext-dev/contract", bcontext-api, bcontext-web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # The apps consume the contract from dist/.
+      - run: npm run -s build -w @bcontext-dev/contract
+      - run: npm run verify -w "${{ matrix.workspace }}"
+
+  compose:
+    name: compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup.sh writes a valid .env
+        run: ./setup.sh --domain localhost --admin-email ci@example.com -y
+      - run: docker compose config -q
+      - run: sh -n deploy/migrate/migrate.sh && bash -n setup.sh

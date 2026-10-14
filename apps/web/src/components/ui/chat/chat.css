@@ -1,0 +1,110 @@
+/* The few chat-kit styles Tailwind utilities cannot express on their own:
+ * keyframes, the shimmer gradient, Shiki's dual-theme colours and the
+ * `.markdown` base that `.chat-md` in globals.css refines. Imported once from
+ * globals.css; the components in this folder reference these class names, so
+ * renaming one here means renaming it there too. */
+
+/* Nexo's face sits in the avatar slot of an assistant message. */
+.chat-message__avatar {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* Typing dots: three dots bouncing out of phase. */
+@keyframes chat-loader-bounce {
+  0%, 80%, 100% { opacity: 0.35; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1); }
+}
+.chat-loader__dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background-color: var(--muted);
+  animation: chat-loader-bounce 1.2s ease-in-out infinite both;
+}
+.chat-loader__dot:nth-child(1) { animation-delay: -0.24s; }
+.chat-loader__dot:nth-child(2) { animation-delay: -0.12s; }
+@media (prefers-reduced-motion: reduce) {
+  .chat-loader__dot { opacity: 0.7; animation: none; }
+}
+
+/* A line of text with a light band sweeping across it: "working on it". */
+@keyframes text-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+.text-shimmer {
+  --_fg: currentColor;
+  --_bg: color-mix(in oklch, currentColor 45%, transparent);
+  display: inline-block;
+  width: fit-content;
+  background: linear-gradient(
+      105deg,
+      var(--_bg) 35%,
+      var(--_fg) 50%,
+      var(--_bg) 65%
+    )
+    0 0 / 300% 100% no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 2.2s linear infinite;
+}
+:is(.dark, [data-theme="dark"]) .text-shimmer {
+  --_fg: oklch(from currentColor max(0.8, calc(l + 0.4)) c h);
+}
+@media (prefers-reduced-motion: reduce) {
+  .text-shimmer {
+    -webkit-text-fill-color: unset;
+    background: none;
+    opacity: 0.6;
+    animation: none;
+  }
+}
+
+/* Markdown base. `.chat-md .markdown …` in globals.css is the real look;
+ * this only sets what an un-wrapped `.markdown` needs to read at all. */
+.markdown {
+  width: 100%;
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.625;
+  color: var(--foreground);
+}
+
+/* Streamdown wraps each newly streamed word in [data-sd-animate] and names
+ * the keyframe through --sd-animation; the keyframes are ours to ship. */
+@keyframes sd-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sd-blurIn {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+@keyframes sd-slideUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.markdown [data-sd-animate] {
+  animation: var(--sd-animation, sd-fadeIn) var(--sd-duration, 150ms)
+    var(--sd-easing, ease) var(--sd-delay, 0ms) both;
+}
+
+/* Shiki renders both themes into CSS variables (defaultColor: false); the
+ * active theme picks which one paints. */
+.chat-code-block__code pre {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: transparent !important;
+}
+.chat-code-block__code code {
+  font-family: var(--font-mono);
+}
+.chat-code-block__code .shiki,
+.chat-code-block__code .shiki span {
+  color: var(--shiki-light, var(--surface-secondary-foreground));
+}
+:is(.dark, [data-theme="dark"]) .chat-code-block__code .shiki,
+:is(.dark, [data-theme="dark"]) .chat-code-block__code .shiki span {
+  color: var(--shiki-dark, var(--surface-secondary-foreground));
+}

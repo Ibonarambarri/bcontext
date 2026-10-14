@@ -1,0 +1,24 @@
+{
+  "name": "bcontext",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bcontext: a self-hostable, MCP-first context layer for teams that work with AI agents.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ibonarambarri/bcontext.git"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run -s build -w @bcontext-dev/contract && npm run -s build -w bcontext-api && npm run -s build -w bcontext-web",
+    "test": "npm run -s test -w @bcontext-dev/contract && npm run -s test -w bcontext-api && npm run -s test -w bcontext-web",
+    "verify": "npm run -s verify -w @bcontext-dev/contract && npm run -s verify -w bcontext-api && npm run -s verify -w bcontext-web",
+    "dev:web": "npm run dev -w bcontext-web"
+  }
+}

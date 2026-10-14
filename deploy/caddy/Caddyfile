@@ -1,0 +1,37 @@
+# The one public entry point: a single origin for the web app, the API, the
+# MCP endpoint and the Supabase gateway.
+#
+# BCONTEXT_SITE_ADDRESS is a bare domain (`ctx.example.com`) for automatic
+# HTTPS with Let's Encrypt, or `http://localhost` for a local install
+# (setup.sh writes it). Ports 80 and 443 must reach this container.
+{$BCONTEXT_SITE_ADDRESS} {
+	# Ordered: the first matching handle wins.
+	route {
+		# The web app's own endpoint (browser error reports); every other
+		# /api path belongs to the API.
+		handle /api/client-errors {
+			reverse_proxy web:3000
+		}
+
+		# Supabase, for the browser's sign-in and for public storage URLs.
+		@supabase path /auth/v1/* /rest/v1/* /storage/v1/*
+		handle @supabase {
+			reverse_proxy kong:8000
+		}
+
+		# The API: REST, MCP (streamable HTTP/SSE), discovery, realtime
+		# WebSockets, the MCP installer.
+		@api path /api/* /mcp /mcp/* /.well-known/* /realtime/* /install/* /llms.txt /healthz
+		handle @api {
+			reverse_proxy api:4000 {
+				# MCP responses stream; never buffer them.
+				flush_interval -1
+			}
+		}
+
+		handle {
+			encode zstd gzip
+			reverse_proxy web:3000
+		}
+	}
+}
