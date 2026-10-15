@@ -4,6 +4,17 @@
 # BCONTEXT_SITE_ADDRESS is a bare domain (`ctx.example.com`) for automatic
 # HTTPS with Let's Encrypt, or `http://localhost` for a local install
 # (setup.sh writes it). Ports 80 and 443 must reach this container.
+
+# Behind another reverse proxy (Traefik, nginx) on the same Docker host,
+# trust its X-Forwarded-* headers so the apps see the original https scheme
+# and client address. Only private addresses are trusted, so a direct
+# install is unaffected.
+{
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
 {$BCONTEXT_SITE_ADDRESS} {
 	# Ordered: the first matching handle wins.
 	route {

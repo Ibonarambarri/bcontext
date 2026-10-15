@@ -75,6 +75,23 @@ certificate on its own; it needs the DNS record to point at this machine and
 ports 80 and 443 open before the first request. Certificates are kept in the
 `caddy-data` volume.
 
+### Behind an existing reverse proxy
+
+If the machine already runs a proxy on ports 80 and 443 (Traefik from
+Coolify, nginx, another Caddy), let it terminate HTTPS and pass plain HTTP
+to Bcontext's Caddy. After `setup.sh --domain ctx.example.com`, edit `.env`:
+
+```bash
+BCONTEXT_SITE_ADDRESS=http://ctx.example.com   # Caddy serves plain HTTP
+HTTP_PORT=127.0.0.1:18080                      # loopback only
+HTTPS_PORT=127.0.0.1:18443                     # unused, kept off 443
+```
+
+`PUBLIC_URL` stays `https://ctx.example.com`. Point the proxy at
+`127.0.0.1:18080`, or put `caddy` on the proxy's Docker network and target
+`http://bcontext-caddy-1:80`, keeping the `Host` header. Caddy trusts the
+`X-Forwarded-*` headers of proxies on private addresses.
+
 Everything is served from that one origin: the web app, the API (`/api/*`),
 MCP (`/mcp`), realtime (`/realtime/*`), discovery (`/.well-known/*`) and the
 Supabase gateway (`/auth/v1`, `/rest/v1`, `/storage/v1`). See
