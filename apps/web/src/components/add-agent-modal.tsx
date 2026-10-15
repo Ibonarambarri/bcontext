@@ -857,7 +857,7 @@ function TokenConnectStep({
         </p>
       </SectionDisclosure>
 
-      <SectionDisclosure icon={Zap} label={`MCP tools exposed (${MCP_TOOLS.length})`}>
+      <SectionDisclosure icon={Zap} label={`MCP tools (up to ${MCP_TOOLS.length}, by scope)`}>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {MCP_TOOLS.map(([toolName, desc]) => (
             <div

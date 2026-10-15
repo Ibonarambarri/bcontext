@@ -29,7 +29,9 @@ Run and check:
   but not running, start it (on macOS `open -a Docker`, then wait until
   `docker info` succeeds).
 - `git --version`, `openssl version`, `bash` and `awk`.
-- Free RAM: about 4 GB while images build, about 1 GB once running.
+- Free RAM: about 1 GB to run, about 4 GB if the images have to be built
+  from source (`free -m` on Linux, `vm_stat` or Docker Desktop's resource
+  settings on macOS).
 
 If something is missing, tell the person what and how to install it for
 their OS, and stop until it is there.
@@ -56,8 +58,10 @@ git clone https://github.com/Ibonarambarri/bcontext.git && cd bcontext
 ```
 
 If the person already has one (a `docker-compose.yml` and `setup.sh` in the
-folder), this is an **update**: `git pull`, then go to step 5 with
-`docker compose up -d --build`. Their `.env` is kept.
+folder), this is an **update**: `git pull`, then
+`docker compose pull && docker compose up -d` (or `docker compose up -d
+--build` if they build from source). Their `.env` is kept; skip to step 5's
+health check.
 
 ## 4. Configure
 
@@ -100,8 +104,8 @@ The first run pulls the release images, or builds them from source if none
 exist (several minutes). Then wait until it is ready, checking every
 15 seconds for up to 10 minutes:
 
-- `docker compose ps`: `migrate` has exited with code 0, `api` and `web`
-  are `healthy`.
+- `docker compose ps -a`: `migrate` has exited with code 0, `api` and
+  `web` are `healthy`.
 - `curl -fsS <PUBLIC_URL>/api/health` returns `"status":"ok"`.
   `PUBLIC_URL` is in `.env`: `http://localhost` (with `:8080` if you changed
   the port) or `https://<domain>`.
@@ -113,8 +117,9 @@ the failing one and see Troubleshooting.
 
 Creating the account needs a password only they should know. Tell them:
 
-> Open **<PUBLIC_URL>/start**, create your account with **<admin email>**,
-> then name your organization and first workspace. Tell me when you are in.
+> Open **<PUBLIC_URL>/start**, create your account with **<admin email>**
+> and name your organization (its first workspace, `general`, is created
+> for you). Tell me when you are in.
 
 When they confirm, ask for the URL they see in the browser; it looks like
 `<PUBLIC_URL>/w/<org>/<workspace>`. The two slugs are what you need.
@@ -134,8 +139,10 @@ It authenticates with OAuth: tell the person to run `/mcp` in Claude Code
 and approve in the browser. For **other clients** (Cursor, Codex, Windsurf,
 VS Code), write the client's MCP config with that URL as described in
 [connect-agents.md](connect-agents.md); clients without OAuth need an agent
-token, which the person creates in the web app under **Agents → Add
-agent**.
+token: in the web app, **Agents → Add agent**, choose the *API key*
+method and follow the wizard to the end (Method → Provider → Configure →
+Connect); the token is shown once on the last step, with a ready-made
+snippet for the client.
 
 Then check: list the server's tools, call `brief` and confirm it answers
 (an empty workspace is fine).
@@ -150,4 +157,4 @@ Finish with a short summary:
 - what was left out (AI, email, integrations) and the
   [self-hosting guide](self-hosting.md) section for each;
 - day-to-day commands: `docker compose ps`, `docker compose logs -f api`,
-  and to update: `git pull && docker compose up -d --build`.
+  and to update: `git pull && docker compose pull && docker compose up -d`.

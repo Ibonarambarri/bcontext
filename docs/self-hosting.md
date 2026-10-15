@@ -201,7 +201,18 @@ reach it through an SSH tunnel.
 Migrations are read from the checkout (`apps/api/supabase/migrations`), so
 the code and the images must move together.
 
-- **Built from source** (the default until you use release images):
+- **Release images** (the default: `BCONTEXT_VERSION=latest` follows the
+  newest release):
+
+  ```bash
+  git pull
+  docker compose pull
+  docker compose up -d
+  ```
+
+  To pin a version, check out its tag and set `BCONTEXT_VERSION` to it in
+  `.env` (`git fetch --tags && git checkout v0.1.0`, `BCONTEXT_VERSION=0.1.0`).
+- **Built from source** (a fork, or code ahead of the last release):
 
   ```bash
   git pull
@@ -209,14 +220,6 @@ the code and the images must move together.
   ```
 
   Without `--build`, Compose keeps the images it already has.
-- **Release images**: check out the release tag and set `BCONTEXT_VERSION`
-  to the same version in `.env`, then:
-
-  ```bash
-  git fetch --tags && git checkout v1.2.3
-  docker compose pull
-  docker compose up -d
-  ```
 
 Either way `migrate` applies the new migrations before `api` and `worker`
 start again. Check it with `docker compose logs migrate`.
@@ -264,7 +267,7 @@ and applies nothing. Test a restore before you need one.
 
 ## Operating
 
-- Status: `docker compose ps`. `api` and `web` have health checks; `migrate`
+- Status: `docker compose ps -a`. `api` and `web` have health checks; `migrate`
   shows `Exited (0)` when it is done.
 - Logs: `docker compose logs -f api worker` (JSON lines; `worker.job.failed`
   for failed jobs).
