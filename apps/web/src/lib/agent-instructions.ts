@@ -10,7 +10,7 @@
  * quickstart render one here, with the workspace's own address baked in.
  *
  * Pure, no React: `agent-instructions.test.ts` pins the shape. The
- * conventions mirror the plugin's skill (`Bcontext-dev/bcontext-plugin`)
+ * conventions mirror the plugin's skill (`plugin/skills/bcontext/SKILL.md`)
  * and the server's `instructions`; when those change, this changes too.
  */
 import type { McpTarget } from "@/lib/mcp-endpoint";

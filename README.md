@@ -232,6 +232,7 @@ apps/api            API, MCP server, worker, error collector, migrations (one im
 apps/web            Next.js web app
 packages/contract   types and helpers both apps share
 deploy/             Caddyfile, Supabase gateway and init SQL, migration runner
+plugin/             Claude Code plugin: conventions skill and /bcontext:brief
 docker-compose.yml  the self-hosted stack
 setup.sh            writes .env with fresh secrets
 ```

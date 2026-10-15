@@ -13,6 +13,9 @@ Guidance for coding agents (and humans) contributing to this repository.
 - `packages/contract` — `@bcontext-dev/contract`, the types and pure helpers
   both apps share. Depends on nothing outside itself.
 - `deploy/`, `docker-compose.yml`, `setup.sh` — the self-hosted stack.
+- `plugin/` — the Claude Code plugin (conventions skill, `/bcontext:brief`,
+  MCP entry); `.claude-plugin/marketplace.json` makes this repo its
+  marketplace.
 
 ## Rules
 
@@ -37,6 +40,6 @@ Guidance for coding agents (and humans) contributing to this repository.
   saying what it is, who calls it and what must not break.
 - **Docs move with the change**: if you change MCP tools, env variables,
   the compose stack or setup, update the README / `.env.example` in the same
-  PR.
+  PR. A change to the MCP tools also updates `plugin/skills/bcontext/SKILL.md`.
 - Lockfile: regenerate only with a full `npx npm@11 install` (Node 24's npm),
   never `--package-lock-only`.

@@ -42,7 +42,7 @@ skill with the working conventions and a `/bcontext:brief` command. In
 Claude Code:
 
 ```
-/plugin marketplace add Bcontext-dev/bcontext-plugin
+/plugin marketplace add Ibonarambarri/bcontext
 /plugin install bcontext@bcontext
 ```
 
@@ -55,8 +55,10 @@ export BCONTEXT_TOKEN="bctx_live_…"             # an agent token
 export BCONTEXT_WORKSPACE="acme/docs"           # only for a user token, see below
 ```
 
-Set `BCONTEXT_URL`: without it the plugin points at the hosted service, not
-your instance.
+`BCONTEXT_URL` has no default: until it is set, the plugin's `bcontext`
+server shows as failed in `/mcp`. If you connect per project with
+`claude mcp add` (below), you can leave it unset and still use the plugin's
+skill and `/bcontext:brief`. The plugin's source is in [`plugin/`](../plugin).
 
 **Without the plugin**, add the server to the project:
 

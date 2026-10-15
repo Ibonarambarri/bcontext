@@ -17,7 +17,7 @@ export const metadata = {
     "Connect Claude Code or Claude Desktop to a Bcontext workspace via MCP in under a minute.",
 };
 
-const PLUGIN_INSTALL = `/plugin marketplace add Bcontext-dev/bcontext-plugin
+const PLUGIN_INSTALL = `/plugin marketplace add Ibonarambarri/bcontext
 /plugin install bcontext@bcontext`;
 
 /** The copyable examples, on this instance's own origin. */

@@ -976,7 +976,7 @@ function useReachedEnd(active: boolean) {
 /* ── After connecting: make the agent good at it ─────────────────────── */
 
 const PLUGIN_INSTALL = [
-  "/plugin marketplace add Bcontext-dev/bcontext-plugin",
+  "/plugin marketplace add Ibonarambarri/bcontext",
   "/plugin install bcontext@bcontext",
 ].join("\n");
 
