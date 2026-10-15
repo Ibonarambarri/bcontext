@@ -22,6 +22,9 @@ configuring and operating it. Every variable is listed in
 
 ## Install
 
+Prefer to have a coding agent do it? Paste the prompt from the README's
+Quickstart; the agent follows [install-with-an-agent.md](install-with-an-agent.md).
+
 ```bash
 git clone https://github.com/Ibonarambarri/bcontext.git && cd bcontext
 ./setup.sh

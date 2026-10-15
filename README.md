@@ -18,7 +18,7 @@ Self-hosted, open source, one `docker compose up`.
 [![MCP](https://img.shields.io/badge/MCP-Streamable_HTTP-black)](docs/connect-agents.md)
 [![Self-hosted](https://img.shields.io/badge/self--hosted-docker_compose-2496ED?logo=docker&logoColor=white)](docs/self-hosting.md)
 
-[Quickstart](#quickstart) · [Self-hosting](docs/self-hosting.md) · [Connect an agent](docs/connect-agents.md) · [Configuration](docs/configuration.md)
+[Quickstart](#quickstart) · [Install with an agent](docs/install-with-an-agent.md) · [Self-hosting](docs/self-hosting.md) · [Connect an agent](docs/connect-agents.md) · [Configuration](docs/configuration.md)
 
 <br>
 
@@ -156,6 +156,25 @@ auto-accepted above a confidence threshold you set.
 </table>
 
 ## Quickstart
+
+### Let your agent install it
+
+Paste this into Claude Code, Codex, Cursor or any agent with a shell:
+
+```text
+Install Bcontext (https://github.com/Ibonarambarri/bcontext) on this machine.
+Follow https://raw.githubusercontent.com/Ibonarambarri/bcontext/main/docs/install-with-an-agent.md
+step by step: clone or update the repo, configure it, start it, wait until it
+is healthy, then connect yourself to my workspace over MCP. Ask me only for
+what you cannot decide.
+```
+
+It checks Docker, asks where it should run and your email, writes the
+configuration, starts the stack and, once you have created your account,
+connects itself over MCP. The steps it follows are in
+[docs/install-with-an-agent.md](docs/install-with-an-agent.md).
+
+### Or by hand
 
 You need Docker with Compose v2, `openssl` and about 4 GB of free RAM to build
 (the running stack uses under 1 GB).
