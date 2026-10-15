@@ -64,6 +64,11 @@ services:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
     depends_on:
       api:
         condition: service_started
@@ -119,6 +124,12 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    # The worker serves no HTTP; healthy means it can still reach Postgres.
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(5432,'db').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   errors:
     <<: *bcontext-api
