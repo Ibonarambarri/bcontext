@@ -24,4 +24,5 @@ npm-debug.log*
 
 # local agent tooling (user-specific config, may hold secrets)
 .mcp.json
+!plugin/.mcp.json
 .claude/

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "bcontext": {
+      "type": "http",
+      "url": "${BCONTEXT_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${BCONTEXT_TOKEN}",
+        "X-Bcontext-Workspace": "${BCONTEXT_WORKSPACE:-}"
+      }
+    }
+  }
+}
